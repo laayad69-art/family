@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>دردشة الأسرة</title>
+
+<!-- Manifest & Theme -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#075e54">
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+*{box-sizing:border-box;font-family:'Cairo',sans-serif;}
+body,html{margin:0;padding:0;height:100%;background:#e5ddd5;}
+.phone{width:100%;max-width:420px;height:100vh;background:#f0f0f0;display:flex;flex-direction:column;position:relative;overflow:hidden;}
+
+/* Splash Screen */
+#splash{position:absolute;inset:0;background:#075e54;color:#FFD700;display:flex;justify-content:center;align-items:center;font-size:2rem;font-weight:bold;z-index:10;flex-direction:column;}
+
+/* LOGIN */
+#loginScreen{position:absolute;inset:0;background:linear-gradient(135deg,#7e57c2,#512da8);display:flex;justify-content:center;align-items:center;z-index:9;}
+.loginBox{background:#fff;padding:30px;border-radius:25px;width:85%;text-align:center;}
+.loginBox input{width:100%;padding:14px;border-radius:15px;border:2px solid #7e57c2;margin:15px 0;font-size:1.1rem;text-align:center;}
+.loginBox button{width:100%;padding:14px;border:none;border-radius:15px;background:#7e57c2;color:#fff;font-size:1.1rem;cursor:pointer;}
+
+/* TOP BAR */
+.top{background:#075e54;color:#fff;padding:10px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:2;}
+.avatar{width:42px;height:42px;border-radius:50%;background:#fff;color:#075e54;display:flex;align-items:center;justify-content:center;overflow:hidden;font-weight:bold;cursor:pointer;}
+.avatar img{width:100%;height:100%;object-fit:cover;}
+.top span{flex:1}
+
+/* PIN */
+#pin{background:#fff3cd;padding:8px;font-size:.9rem;text-align:center;display:none;margin:0 8px 8px 8px;border-radius:10px;}
+
+/* CHAT */
+#chat{flex:1;padding:12px;overflow-y:auto;background-size:cover;background-position:center;}
+.msg{display:flex;margin-bottom:8px;animation:fade .2s ease;position:relative;}
+.sent{justify-content:flex-end}
+.recv{justify-content:flex-start}
+.bubble{max-width:78%;padding:10px 14px;border-radius:18px;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.15);position:relative;}
+.sent .bubble{background:#dcf8c6;border-bottom-right-radius:5px;}
+.recv .bubble{border-bottom-left-radius:5px;}
+.react{font-size:.8rem;margin-top:3px;cursor:pointer;}
+.replyMsg{background:#eee;padding:4px 8px;margin-bottom:5px;border-left:3px solid #075e54;border-radius:5px;font-size:.8rem;color:#333;}
+.reactions{display:flex;gap:4px;margin-top:5px;font-size:0.9rem;}
+
+/* Typing Indicator */
+#typing{padding:6px 15px;font-size:.85rem;color:#555;display:none;}
+
+/* Input */
+.input{display:flex;gap:6px;padding:8px;background:#f0f0f0;align-items:center;}
+textarea{flex:1;border:none;border-radius:20px;padding:10px;resize:none;}
+.send,.mediaBtn,.audioBtn,.stickerBtn{width:45px;height:45px;border-radius:50%;border:none;background:#075e54;color:#fff;font-size:1.2rem;cursor:pointer;}
+
+/* Stickers Panel */
+#stickersPanel{position:absolute;bottom:60px;right:10px;background:#fff;padding:10px;border-radius:15px;display:none;flex-wrap:wrap;gap:6px;z-index:5;max-width:300px;}
+.sticker{width:50px;height:50px;cursor:pointer;border-radius:10px;}
+
+/* Install Button */
+#installBtn{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 20px;font-size:16px;border-radius:10px;background:#FFD700;color:#075e54;border:none;cursor:pointer;z-index:10;display:none;}
+
+/* Animations */
+@keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1}}
+</style>
+</head>
+
+<body>
+<div class="phone">
+
+<!-- Splash -->
+<div id="splash">❤️ دردشة الأسرة ❤️</div>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+<div class="loginBox">
+<h2>تسجيل الدخول</h2>
+<input type="password" id="pass" placeholder="كلمة السر">
+<button id="loginBtn">دخول</button>
+<p id="err" style="color:red;display:none">كلمة سر خاطئة</p>
+</div>
+</div>
+
+<!-- TOP BAR -->
+<div class="top">
+<div class="avatar" onclick="pickAvatar()">
+<img id="avatarImg" hidden>
+<span id="avatarTxt"></span>
+</div>
+<span id="user"></span>
+<button onclick="pickBg()">🎨</button>
+<button class="stickerBtn" onclick="toggleStickers()">😊</button>
+</div>
+
+<!-- PIN -->
+<div id="pin">📌 رسالة مثبتة</div>
+
+<!-- CHAT -->
+<div id="chat"></div>
+<div id="typing">✍️ يكتب الآن...</div>
+
+<!-- Stickers -->
+<div id="stickersPanel">
+<img src="https://i.imgur.com/1R8ZLz9.png" class="sticker" onclick="sendSticker(this.src)">
+<img src="https://i.imgur.com/Xzv3s4K.png" class="sticker" onclick="sendSticker(this.src)">
+<img src="https://i.imgur.com/7nO4h2V.png" class="sticker" onclick="sendSticker(this.src)">
+</div>
+
+<!-- INPUT -->
+<div class="input">
+<button class="mediaBtn" onclick="pickMedia()">📎</button>
+<button class="audioBtn" id="recordBtn">🎤</button>
+<textarea id="msg" placeholder="اكتب رسالة..."></textarea>
+<button class="send" onclick="send()">➤</button>
+</div>
+
+<!-- Install Button -->
+<button id="installBtn">📥 تثبيت التطبيق</button>
+
+<!-- Hidden Inputs -->
+<input type="file" id="bgPicker" accept="image/*" hidden>
+<input type="file" id="avatarPicker" accept="image/*" hidden>
+<input type="file" id="mediaPicker" accept="image/*,video/*,audio/*,.pdf,.doc,.docx" hidden>
+
+<script>
+// ===== Firebase =====
+firebase.initializeApp({
+apiKey:"AIzaSyBLOTRVui_Zdyl2_Hy",
+databaseURL:"https://family-94192-default-rtdb.firebaseio.com"
+});
+const db=firebase.database();
+
+// ===== Variables =====
+let me="", replyTo=null, mediaFile=null, recorder, audioChunks=[], deferredPrompt;
+
+// ===== Splash =====
+window.onload=()=>{setTimeout(()=>splash.style.display="none",1500);};
+
+// ===== LOGIN =====
+function tryLogin(){
+const p=document.getElementById("pass").value;
+if(p==="2024") me="اياد";
+else if(p==="2025") me="الاء";
+else return err.style.display="block";
+document.getElementById("loginScreen").style.display="none";
+user.innerText=me;
+avatarTxt.innerText=me[0];
+loadPrefs();
+listen();
+db.ref("status/"+me).set(true);
+}
+document.getElementById("pass").addEventListener("keypress",function(e){if(e.key==="Enter"){tryLogin();}});
+document.getElementById("loginBtn").addEventListener("click",tryLogin);
+
+// ===== AVATAR =====
+function pickAvatar(){avatarPicker.click();}
+avatarPicker.onchange=()=>{const r=new FileReader();r.onload=()=>{avatarImg.src=r.result;avatarImg.hidden=false;avatarTxt.hidden=true;localStorage.av=r.result;};r.readAsDataURL(avatarPicker.files[0]);}
+
+// ===== BACKGROUND =====
+function pickBg(){bgPicker.click();}
+bgPicker.onchange=()=>{const r=new FileReader();r.onload=()=>{chat.style.background=`url(${r.result})`;localStorage.bg=r.result;};r.readAsDataURL(bgPicker.files[0]);}
+function loadPrefs(){if(localStorage.bg) chat.style.background=`url(${localStorage.bg})`;if(localStorage.av){avatarImg.src=localStorage.av;avatarImg.hidden=false;avatarTxt.hidden=true;}}
+
+// ===== SEND MESSAGE =====
+function send(){
+let txt=msg.value.trim();
+if(!txt && !mediaFile) return;
+let message={u:me,t:txt,reply:replyTo?replyTo.innerText:""};
+if(mediaFile){message.media=mediaFile;message.mediaType=mediaFile.type||"image/png";mediaFile=null;}
+db.ref("chat").push(message);
+msg.value="";replyTo=null;
+}
+function sendSticker(src){mediaFile=src;send();stickersPanel.style.display="none";}
+
+// ===== LISTEN =====
+function listen(){
+db.ref("chat").on("child_added",s=>{
+const m=s.val();
+const d=document.createElement("div");
+d.className="msg "+(m.u===me?"sent":"recv");
+let replyHTML=m.reply?`<div class="replyMsg">↪ ${m.reply}</div>`:"";
+let mediaHTML="";
+if(m.media){
+if(m.media.startsWith("http")) mediaHTML=`<img src="${m.media}" style="max-width:150px;border-radius:10px;">`;
+}
+d.innerHTML=`<div class="bubble">${replyHTML}${m.t||""}${mediaHTML}<div class="reactions"></div><button class="reactBtn" style="font-size:0.9rem;cursor:pointer;margin-top:3px;">😀</button></div>`;
+d.querySelector(".bubble").addEventListener("click",()=>replyTo=d.querySelector(".bubble"));
+chat.appendChild(d);chat.scrollTop=chat.scrollHeight;
+
+// Typing
+if(Notification.permission==="granted" && m.u!==me){new Notification("رسالة جديدة",{body:m.t||"وسائط"});}
+
+// Reactions
+d.querySelector(".reactBtn").addEventListener("click", ()=>{
+const reactionBar=d.querySelector(".reactions");
+if(reactionBar.style.display==="") reactionBar.style.display="flex";
+else reactionBar.style.display="";
+if(reactionBar.innerHTML===""){
+const emojis=["❤️","😂","😮","😢","👍"];
+emojis.forEach(e=>{
+const span=document.createElement("span");
+span.innerText=e;span.style.cursor="pointer";span.style.margin="0 2px";
+span.addEventListener("click", ()=>{reactionBar.innerText=e;});
+reactionBar.appendChild(span);
+});
+}
+});
+});
+}
+
+// ===== TYPING =====
+msg.addEventListener("input",()=>{if(msg.value.trim()) db.ref("typing/"+me).set(true); else db.ref("typing/"+me).set(false);});
+db.ref("typing").on("value",snap=>{
+let typingUsers=[];
+snap.forEach(s=>{if(s.key!==me && s.val()) typingUsers.push(s.key);});
+typing.style.display=typingUsers.length?"block":"none";typing.innerText="✍️ "+typingUsers.join(", ")+" يكتب الآن...";
+});
+
+// ===== MEDIA =====
+function pickMedia(){mediaPicker.click();}
+mediaPicker.onchange=()=>{const file=mediaPicker.files[0];const reader=new FileReader();reader.onload=()=>{mediaFile={data:reader.result,type:file.type};send();mediaPicker.value="";};reader.readAsDataURL(file);}
+
+// ===== AUDIO =====
+recordBtn.addEventListener("mousedown", async ()=>{
+const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+recorder=new MediaRecorder(stream);audioChunks=[];
+recorder.ondataavailable=e=>audioChunks.push(e.data);
+recorder.start();
+});
+recordBtn.addEventListener("mouseup", ()=>{
+if(recorder){recorder.stop();recorder.onstop=()=>{
+mediaFile=new Blob(audioChunks,{type:"audio/webm"});send();
+};}
+});
+
+// ===== STICKERS =====
+function toggleStickers(){stickersPanel.style.display=stickersPanel.style.display==="flex"?"none":"flex";}
+
+// ===== INSTALL PWA =====
+window.addEventListener('beforeinstallprompt',(e)=>{e.preventDefault();deferredPrompt=e;installBtn.style.display="block";});
+installBtn.addEventListener("click",async ()=>{
+installBtn.style.display="none";deferredPrompt.prompt();
+deferredPrompt=null;
+});
+if("Notification" in window && Notification.permission!=="granted"){Notification.requestPermission();}
+</script>
+</div>
+</body>
+</html>
